@@ -8,9 +8,9 @@
 
 set -e
 
-if ! [[ "$1" =~ ^(web|worker|cron)$ ]]; then
+if ! [[ "$1" =~ ^(web|worker|cron|migrate)$ ]]; then
     echo "Usage: $0 [service]"
-    echo " Services can be web; worker; cron"
+    echo " Services can be web; worker; cron; migrate"
     exit 1
 fi
 
