@@ -133,23 +133,27 @@ function cache_and_docs_generation() {
     php artisan l5-swagger:generate
 }
 
-# start_web_service
+# apply_db_migration
 #
-# this function gets the container ready to start apache.
-function start_web_service() {
-
-    echo "Starting first run routines"
-
+# This function will apply database migrations
+function apply_db_migration() {
     php artisan migrate
     php artisan eve:update:sde -n
     php artisan db:seed --class=Seat\\Console\\database\\seeds\\ScheduleSeeder
-
-    echo "Completed first run routines"
-
     install_plugins "migrate"
 
     # register dev packages if setup
     test -f packages/override.json && register_dev_packages "migrate"
+}
+
+# start_web_service
+#
+# this function gets the container ready to start apache.
+function start_web_service() {
+    install_plugins
+
+    # register dev packages if setup
+    test -f packages/override.json && register_dev_packages
 
     echo "Dumping the autoloader"
     composer dump-autoload
@@ -221,5 +225,9 @@ case $1 in
     cron)
         echo "starting cron service"
         start_cron_service
+        ;;
+    migrate)
+        echo "applying database migrations"
+        apply_db_migration
         ;;
 esac
