@@ -2,11 +2,13 @@
 
 name: Docker build & Push
 
-# Controls when the action will run. 
 on:
-  push:
-    tags:
-      - '*'
+  release:
+    types: [published]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_OWNER: ${{ github.repository_owner }}
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
