@@ -140,10 +140,10 @@ function apply_db_migration() {
     php artisan migrate
     php artisan eve:update:sde -n
     php artisan db:seed --class=Seat\\Console\\database\\seeds\\ScheduleSeeder
-    install_plugins "migrate"
+    #install_plugins "migrate"
 
     # register dev packages if setup
-    test -f packages/override.json && register_dev_packages "migrate"
+    #test -f packages/override.json && register_dev_packages "migrate"
 }
 
 # start_web_service
