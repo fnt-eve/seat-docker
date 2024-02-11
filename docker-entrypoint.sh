@@ -156,29 +156,18 @@ function print_logo() {
 function apply_db_migration() {
     php artisan migrate
     php artisan eve:update:sde -n
-    php artisan db:seed --class=Seat\\Console\\database\\seeds\\ScheduleSeeder
-    #install_plugins "migrate"
-
-    # register dev packages if setup
-    #test -f packages/override.json && register_dev_packages "migrate"
-}
-
-# start_web_service
-#
-# this function gets the container ready to start apache.
-function start_web_service() {
-
-    update_stack
-
-    php artisan migrate
-    php artisan eve:update:sde -n
     php artisan db:seed --class=Seat\\Services\\Database\\Seeders\\PluginDatabaseSeeder
 
     # regenerate the l5-swagger docs. Done late so as to have the correct server url set
     php artisan l5-swagger:generate
 
     print_logo
+}
 
+# start_web_service
+#
+# this function gets the container ready to start apache.
+function start_web_service() {
     # lets 🚀
     exec apache2-foreground
 }
