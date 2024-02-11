@@ -16,12 +16,12 @@ fi
 
 # Wait for MySQL
 while ! mysqladmin ping -h"$DB_HOST" -u"$DB_USERNAME" -p"$DB_PASSWORD" -P${DB_PORT:-3306} --silent; do
-    echo "MariaDB container might not be ready yet. Sleeping..."
+    echo "Database container might not be ready yet. Sleeping..."
     sleep 3
 done
 
 # Wait for Redis
-while ! redis-cli -h "$REDIS_HOST" ping; do
+while ! redis-cli -h "$REDIS_HOST" -p ${REDIS_PORT:-6379} ping; do
     echo "Redis container might not be ready yet. Sleeping..."
     sleep 3
 done
@@ -47,24 +47,10 @@ function install_plugins() {
         #   ref: https://github.com/composer/composer/issues/1874
 
         # Require the plugins from the environment variable.
-        composer require ${plugins} --no-update
+        composer require ${plugins} --no-install
 
         # Update the plugins.
         composer update ${plugins} --no-scripts --no-dev --no-ansi --no-progress
-
-        # Redump the autoloader
-        composer dump-autoload
-
-        # Publish assets and migrations and run them.
-        php artisan vendor:publish --force --all
-
-        # run migrations if we got the argument
-        if [ "$1" = "migrate" ]; then
-
-            echo "Running plugin migrations"
-            php artisan migrate
-
-        fi
     fi
 
     echo "Completed plugins processing"
@@ -73,7 +59,7 @@ function install_plugins() {
 # register_dev_packages
 #
 # This function will typically get called if the callee found
-# a packages/override.json file. The override.json is just 
+# a packages/override.json file. The override.json is just
 # another composer.json, but typically with custom paths to
 # local packages, fascilitating development worksflows using
 # the production docker-compose setup.
@@ -102,35 +88,66 @@ function register_dev_packages() {
 
     # Refresh composer setup
     composer update
-
-    # Redump the autoloader
-    composer dump-autoload
-
-    # Publish assets and migrations and run them.
-    php artisan vendor:publish --force --all
-
-    # run migrations if we got the argument
-    if [ "$1" = "migrate" ]; then
-
-        echo "Running plugin migrations"
-        php artisan migrate
-    fi
 }
 
 # cache_and_docs_generation
 #
 # This function will populate the route caches
 # as well as regenerate the l5 swagger docs
-function cache_and_docs_generation() {
+function assets_config_cache() {
+
+    # Publish assets and migrations and run them.
+    php artisan vendor:publish --force --all
 
     # Clear and repopulate the config cache
     php artisan config:cache
-    
+
     # Clear and repopulate the route cache
     php artisan route:cache
-    
-    # regenerate the l5-swagger docs. Done late so as to have the correct server url set
-    php artisan l5-swagger:generate
+}
+
+function update_stack() {
+
+    install_plugins
+
+    # register dev packages if setup
+    test -f packages/override.json && register_dev_packages
+
+    echo "Dumping the autoloader"
+    composer dump-autoload
+
+    # Regenerate the caches and docs
+    assets_config_cache
+}
+
+function print_logo() {
+    echo -e "
+\e[30;49m\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m/\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m(\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m(\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m
+\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m/\e[38;5;214m/\e[38;5;214m/\e[38;5;214m/\e[38;5;214m/\e[38;5;214m/\e[38;5;214m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m(\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m
+\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m*\e[38;5;m*\e[38;5;m/\e[38;5;m*\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;208m/\e[38;5;202m/\e[38;5;202m/\e[38;5;m(\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m
+\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;220m*\e[38;5;220m*\e[38;5;214m*\e[38;5;m*\e[38;5;m*\e[38;5;m(\e[38;5;m*\e[38;5;214m*\e[38;5;214m*\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;214m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m(\e[38;5;m(\e[38;5;m/\e[38;5;202m/\e[38;5;202m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m
+\e[38;5;m*\e[38;5;m*\e[38;5;220m*\e[38;5;220m*\e[38;5;m*\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;m*\e[38;5;214m*\e[38;5;214m*\e[38;5;m*\e[38;5;m*\e[38;5;214m/\e[38;5;214m/\e[38;5;m/\e[38;5;m,\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;202m/\e[38;5;202m/\e[38;5;m/\e[38;5;m/\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m
+\e[38;5;m*\e[38;5;220m*\e[38;5;220m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m.\e[38;5;m.\e[38;5;m.\e[38;5;214m*\e[38;5;214m*\e[38;5;214m*\e[38;5;m/\e[38;5;m#\e[38;5;214m/\e[38;5;214m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;202m/\e[38;5;202m/\e[38;5;m(\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m(\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/
+\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m/\e[38;5;m#\e[38;5;m*\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;202m/\e[38;5;202m/\e[38;5;202m/\e[38;5;202m/\e[38;5;202m/\e[38;5;202m/\e[38;5;m/\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m*\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m&\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m&\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m#\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m%\e[38;5;208m/\e[38;5;208m/\e[38;5;m%\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m#\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m(\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m@\e[38;5;m \e[38;5;m
+\e[38;5;m*\e[38;5;220m*\e[38;5;220m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m*\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;214m/\e[38;5;214m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m(\e[38;5;m(\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m@\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m@\e[38;5;m@\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m@\e[38;5;m@\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m(\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m@\e[38;5;m \e[38;5;m
+\e[38;5;m/\e[38;5;220m*\e[38;5;220m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m*\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;202m/\e[38;5;202m/\e[38;5;m(\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m@\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m@\e[38;5;m@\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m(\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m@\e[38;5;m \e[38;5;m
+\e[38;5;m*\e[38;5;m*\e[38;5;220m*\e[38;5;220m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;214m/\e[38;5;214m/\e[38;5;214m/\e[38;5;m/\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m*\e[38;5;m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m(\e[38;5;m(\e[38;5;202m/\e[38;5;202m/\e[38;5;m/\e[38;5;m/\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m*\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m@\e[38;5;m@\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m@\e[38;5;m@\e[38;5;m@\e[38;5;m(\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m@\e[38;5;m \e[38;5;m
+\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;220m*\e[38;5;220m*\e[38;5;214m*\e[38;5;m*\e[38;5;m/\e[38;5;m*\e[38;5;m/\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m*\e[38;5;214m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;202m/\e[38;5;202m/\e[38;5;202m/\e[38;5;m(\e[38;5;m(\e[38;5;m/\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m
+\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m*\e[38;5;m/\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;208m/\e[38;5;202m/\e[38;5;202m/\e[38;5;m/\e[38;5;m(\e[38;5;m(\e[38;5;m(\e[38;5;m(\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m
+\e[38;5;m*\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m*\e[38;5;214m/\e[38;5;214m/\e[38;5;214m/\e[38;5;214m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;208m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m/\e[38;5;m(\e[38;5;m(\e[38;5;m(\e[38;5;m/\e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m \e[38;5;m
+\e[0m"
+
+  echo -e "
+\e[38;5;208mSeAT is now ready to serve requests
+
+\e[38;5;208mOpen your browser and go to '\e[38;5;220m$APP_URL\e[38;5;208m'
+\e[38;5;208mRun '\e[38;5;220mdocker compose exec front php artisan seat:admin:login\e[38;5;208m' to get a temporary link in order to sign-in as built-in admin user account (or use bellow one)
+\e[0m"
+
+  php artisan seat:admin:login
+
+  echo ""
+  echo ""
 }
 
 # apply_db_migration
@@ -150,22 +167,20 @@ function apply_db_migration() {
 #
 # this function gets the container ready to start apache.
 function start_web_service() {
-    install_plugins
 
-    # register dev packages if setup
-    test -f packages/override.json && register_dev_packages
+    update_stack
 
-    echo "Dumping the autoloader"
-    composer dump-autoload
+    php artisan migrate
+    php artisan eve:update:sde -n
+    php artisan db:seed --class=Seat\\Services\\Database\\Seeders\\PluginDatabaseSeeder
 
-    # Regenerate the caches and docs
-    cache_and_docs_generation
+    # regenerate the l5-swagger docs. Done late so as to have the correct server url set
+    php artisan l5-swagger:generate
 
-    echo "Fixing permissions"
-    find /var/www/seat -path /var/www/seat/packages -prune -o -exec chown www-data:www-data {} +
+    print_logo
 
     # lets 🚀
-    apache2-foreground
+    exec apache2-foreground
 }
 
 # start_worker_service
@@ -175,18 +190,9 @@ function start_web_service() {
 # installation before starting up.
 function start_worker_service() {
 
-    install_plugins
+    update_stack
 
-    # register dev packages if setup
-    test -f packages/override.json && register_dev_packages
-
-    # Regenerate the caches and docs
-    cache_and_docs_generation
-
-    # fix up permissions for the storage directory
-    chown -R www-data:www-data storage
-
-    php artisan horizon
+    exec php artisan horizon
 }
 
 # start_cron_service
@@ -196,13 +202,7 @@ function start_worker_service() {
 # installation before starting up.
 function start_cron_service() {
 
-    install_plugins
-
-    # register dev packages if setup
-    test -f packages/override.json && register_dev_packages
-
-    # Regenerate the caches and docs
-    cache_and_docs_generation
+    update_stack
 
     echo "starting 'cron' loop"
 
