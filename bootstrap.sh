@@ -61,7 +61,7 @@ curl -L https://raw.githubusercontent.com/eveseat/seat-docker/$SEAT_GITHUB_BRANC
 curl -L https://raw.githubusercontent.com/eveseat/seat-docker/$SEAT_GITHUB_BRANCH/docker-compose.mariadb.yml -o $SEAT_DOCKER_INSTALL/docker-compose.mariadb.yml
 curl -L https://raw.githubusercontent.com/eveseat/seat-docker/$SEAT_GITHUB_BRANCH/docker-compose.traefik.yml -o $SEAT_DOCKER_INSTALL/docker-compose.traefik.yml
 curl -L https://raw.githubusercontent.com/eveseat/seat-docker/$SEAT_GITHUB_BRANCH/docker-compose.proxy.yml -o $SEAT_DOCKER_INSTALL/docker-compose.proxy.yml
-curl -L https://raw.githubusercontent.com/eveseat/seat-docker/$SEAT_GITHUB_BRANCH/.env -o $SEAT_DOCKER_INSTALL/.env
+curl -L https://raw.githubusercontent.com/eveseat/seat-docker/$SEAT_GITHUB_BRANCH/.env.example -o $SEAT_DOCKER_INSTALL/.env
 
 echo "Generating a random database password and writing it to the .env file."
 sed -i -- 's/DB_PASSWORD=i_should_be_changed/DB_PASSWORD='$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c22 ; echo '')'/g' .env
@@ -90,7 +90,7 @@ echo "Enabling SSL entrypoint"
 echo "Please provide a valid e-mail address for Let's Encrypt account creation (this service will handle your SSL certificates) - leave empty to not use SSL"
 read -p "e-mail: " ACME_EMAIL
 if [ -n "$ACME_EMAIL" ]; then
-  sed -i -- 's/TRAEFIK_ACME_EMAIL=you@domain.com/TRAEFIK_ACME_EMAIL='"${ACME_EMAIL}"'/g' .env
+  sed -i -- 's/TRAEFIK_ACME_EMAIL=you@domain.tld/TRAEFIK_ACME_EMAIL='"${ACME_EMAIL}"'/g' .env
   sed -i -- 's/      #- "traefik.http.routers.seat-web.tls.certResolver=primary"/      - "traefik.http.routers.seat-web.tls.certResolver=primary"/g' docker-compose.yml
 else
   echo "No e-mail address has been provided, SSL will not be available"
